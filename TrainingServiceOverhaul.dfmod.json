@@ -1,0 +1,26 @@
+{
+    "ModTitle": "TrainingServiceOverhaul",
+    "ModVersion": "1.00",
+    "ModAuthor": "Kirk.O",
+    "ContactInfo": "kirkoliveri@gmail.com",
+    "DFUnity_Version": "0.13.4",
+    "ModDescription": "Overhauls How The Training Services Work To Be More Detailed And Interesting",
+    "GUID": "6135629c-08ef-4c57-8385-70b85b71ebf5",
+    "Files": [
+        "Assets/Game/Mods/DFU-Mod_Training-Service-Overhaul/modsettings.json",
+        "Assets/Game/Mods/DFU-Mod_Training-Service-Overhaul/Scripts/TrainingServiceOverhaulMain.cs",
+        "Assets/Game/Mods/DFU-Mod_Training-Service-Overhaul/Scripts/TrainingServiceOverhaulWindow.cs"
+    ],
+    "Dependencies": [
+        {
+            "Name": "roleplayrealism",
+            "IsOptional": true,
+            "IsPeer": false
+        },
+        {
+            "Name": "unleveled training",
+            "IsOptional": true,
+            "IsPeer": false
+        }
+    ]
+}
