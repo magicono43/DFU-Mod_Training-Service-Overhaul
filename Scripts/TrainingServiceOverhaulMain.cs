@@ -1,11 +1,11 @@
 // Project:         TrainingServiceOverhaul mod for Daggerfall Unity (http://www.dfworkshop.net)
-// Copyright:       Copyright (C) 2021 Kirk.O
+// Copyright:       Copyright (C) 2023 Kirk.O
 // License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
 // Author:          Kirk.O
 // Created On: 	    12/22/2021, 8:50 PM
-// Last Edit:		12/23/2020, 11:50 PM
-// Version:			1.00
-// Special Thanks:  John Doom, Kab the Bird Ranger
+// Last Edit:		4/28/2023, 9:40 AM
+// Version:			1.05
+// Special Thanks:  John Doom, Kab the Bird Ranger, Hazelnut
 // Modifier:
 
 using UnityEngine;
@@ -18,12 +18,7 @@ namespace TrainingServiceOverhaul
 {
     public class TrainingServiceOverhaulMain : MonoBehaviour
     {
-        static TrainingServiceOverhaulMain instance;
-
-        public static TrainingServiceOverhaulMain Instance
-        {
-            get { return instance ?? (instance = FindObjectOfType<TrainingServiceOverhaulMain>()); }
-        }
+        public static TrainingServiceOverhaulMain Instance;
 
         static Mod mod;
 
@@ -44,7 +39,8 @@ namespace TrainingServiceOverhaul
         public static void Init(InitParams initParams)
         {
             mod = initParams.Mod;
-            instance = new GameObject("TrainingServiceOverhaul").AddComponent<TrainingServiceOverhaulMain>(); // Add script to the scene.
+            var go = new GameObject(mod.Title);
+            go.AddComponent<TrainingServiceOverhaulMain>(); // Add script to the scene.
 
             mod.LoadSettingsCallback = LoadSettings; // To enable use of the "live settings changes" feature in-game.
 
@@ -55,14 +51,14 @@ namespace TrainingServiceOverhaul
         {
             Debug.Log("Begin mod init: Training Service Overhaul");
 
+            Instance = this;
+
             mod.LoadSettings();
 
             UIWindowFactory.RegisterCustomUIWindow(UIWindowType.GuildServiceTraining, typeof(TrainingServiceOverhaulWindow));
 
             Debug.Log("Finished mod init: Training Service Overhaul");
         }
-
-        #region Settings
 
         static void LoadSettings(ModSettings modSettings, ModSettingsChange change)
         {
@@ -79,8 +75,6 @@ namespace TrainingServiceOverhaul
             AllowHealthMagicDamage = mod.GetSettings().GetValue<bool>("VitalsRelated", "AllowHealthMagicDamage");
             MaximumPossibleTraining = mod.GetSettings().GetValue<int>("MaxSkillsCanBeTrain", "MaxPossibleTraining");
         }
-
-        #endregion
 
         public static int GetReqRecovHours()
         {

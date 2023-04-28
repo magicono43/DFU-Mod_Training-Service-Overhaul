@@ -1,13 +1,3 @@
-// Project:         TrainingServiceOverhaul mod for Daggerfall Unity (http://www.dfworkshop.net)
-// Copyright:       Copyright (C) 2021 Kirk.O
-// License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
-// Author:          Kirk.O
-// Created On: 	    12/22/2021, 8:50 PM
-// Last Edit:		12/23/2020, 11:50 PM
-// Version:			1.00
-// Special Thanks:  John Doom, Kab the Bird Ranger
-// Modifier:
-
 using System.Collections.Generic;
 using DaggerfallConnect;
 using DaggerfallConnect.Arena2;
@@ -18,15 +8,16 @@ using DaggerfallWorkshop.Game.UserInterface;
 using UnityEngine;
 using DaggerfallWorkshop.Game.Formulas;
 using TrainingServiceOverhaul;
+using DaggerfallWorkshop.Game.Utility;
 
 namespace DaggerfallWorkshop.Game.UserInterfaceWindows
 {
     public class TrainingServiceOverhaulWindow : DaggerfallGuildServiceTraining
     {
-        DFCareer.Skills skillToTrain;
-
+        public static DFCareer.Skills SkillToTrain { get; set; }
         public static int PickedSkillIndex { get; set; }
         public static string PickedSkillName { get; set; }
+        public static int TrainingPrice { get; set; }
 
         public TrainingServiceOverhaulWindow(IUserInterfaceManager uiManager, GuildNpcServices npcService, IGuild guild) : base(uiManager, npcService, guild)
         {
@@ -36,10 +27,13 @@ namespace DaggerfallWorkshop.Game.UserInterfaceWindows
         {
             CloseWindow();
             // Check enough time has passed since last trained
+            SkillToTrain = DFCareer.Skills.None;
+            TrainingPrice = 0;
             DaggerfallDateTime now = DaggerfallUnity.Instance.WorldTime.Now;
+            int minsBeforeTrainAgain = (int)Mathf.Abs((now.ToClassicDaggerfallTime() - playerEntity.TimeOfLastSkillTraining) - (TrainingServiceOverhaulMain.GetReqRecovHours() * 60));
             if ((now.ToClassicDaggerfallTime() - playerEntity.TimeOfLastSkillTraining) < TrainingServiceOverhaulMain.GetReqRecovHours() * 60) // 540 default
             {
-                TextFile.Token[] tokens = DaggerfallUnity.Instance.TextProvider.GetRandomTokens(TrainingToSoonId);
+                TextFile.Token[] tokens = GetRandomTrainingTooSoonText(minsBeforeTrainAgain);
                 DaggerfallMessageBox messageBox = new DaggerfallMessageBox(uiManager, uiManager.TopWindow);
                 messageBox.SetTextTokens(tokens);
                 messageBox.ClickAnywhereToClose = true;
@@ -63,7 +57,7 @@ namespace DaggerfallWorkshop.Game.UserInterfaceWindows
             PickedSkillIndex = index;
             PickedSkillName = skillName;
             List<DFCareer.Skills> trainingSkills = GetTrainingSkills();
-            DFCareer.Skills skillToTrain = trainingSkills[index];
+            SkillToTrain = trainingSkills[index];
             int guildhallQuality = 0;
             string facTitle = "Stranger";
             guildhallQuality = GameManager.Instance.PlayerEnterExit.BuildingDiscoveryData.quality;
@@ -76,12 +70,12 @@ namespace DaggerfallWorkshop.Game.UserInterfaceWindows
             // Offer training price
             DaggerfallMessageBox messageBox = new DaggerfallMessageBox(uiManager, uiManager.TopWindow);
 
-            int trainingPrice = CalculateTrainingPrice(guildhallQuality, player, skillToTrain);
+            TrainingPrice = CalculateTrainingPrice(guildhallQuality, player);
 
             TextFile.Token[] tokens = DaggerfallUnity.Instance.TextProvider.CreateTokens(
                     TextFile.Formatting.JustifyCenter,
                     "For a session in " + skillName + ",",
-                    "it will cost you " + trainingPrice.ToString() + " gold.",
+                    "it will cost you " + TrainingPrice.ToString() + " gold.",
                     "Still interested, " + facTitle + "?");
 
             messageBox.SetTextTokens(tokens, Guild);
@@ -95,15 +89,13 @@ namespace DaggerfallWorkshop.Game.UserInterfaceWindows
         {
             int index = PickedSkillIndex;
             string skillName = PickedSkillName;
-            int guildhallQuality = 0;
-            guildhallQuality = GameManager.Instance.PlayerEnterExit.BuildingDiscoveryData.quality;
             PlayerEntity player = GameManager.Instance.PlayerEntity;
 
             CloseWindow();
 
             if (messageBoxButton == DaggerfallMessageBox.MessageBoxButtons.Yes)
             {
-                if (playerEntity.GetGoldAmount() >= CalculateTrainingPrice(guildhallQuality, player, skillToTrain))
+                if (playerEntity.GetGoldAmount() >= TrainingPrice)
                     TrainingPickedSkill(index, skillName);
                 else
                     DaggerfallUI.MessageBox(DaggerfallTradeWindow.NotEnoughGoldId);
@@ -114,7 +106,6 @@ namespace DaggerfallWorkshop.Game.UserInterfaceWindows
         {
             CloseWindow();
             List<DFCareer.Skills> trainingSkills = GetTrainingSkills();
-            DFCareer.Skills skillToTrain = trainingSkills[index];
             int guildhallQuality = 0;
             string facTitle = "Stranger";
             guildhallQuality = GameManager.Instance.PlayerEnterExit.BuildingDiscoveryData.quality;
@@ -124,11 +115,11 @@ namespace DaggerfallWorkshop.Game.UserInterfaceWindows
             if (Guild.IsMember())
                 facTitle = Guild.GetTitle();
 
-            if (playerEntity.Skills.GetPermanentSkillValue(skillToTrain) > trainingMaximum)
+            if (playerEntity.Skills.GetPermanentSkillValue(SkillToTrain) > trainingMaximum)
             {
                 TextFile.Token[] tokens = null;
                 // Inform player they're too skilled to train
-                if (playerEntity.Skills.GetPermanentSkillValue(skillToTrain) >= MaxPossTrain)
+                if (playerEntity.Skills.GetPermanentSkillValue(SkillToTrain) >= MaxPossTrain)
                 {
                     tokens = DaggerfallUnity.Instance.TextProvider.CreateTokens(
                         TextFile.Formatting.JustifyCenter,
@@ -163,9 +154,8 @@ namespace DaggerfallWorkshop.Game.UserInterfaceWindows
                 DaggerfallDateTime now = DaggerfallUnity.Instance.WorldTime.Now;
                 playerEntity.TimeOfLastSkillTraining = now.ToClassicDaggerfallTime();
                 now.RaiseTime(DaggerfallDateTime.SecondsPerHour * TrainingServiceOverhaulMain.GetHoursPassedTraining()); // 3
-                int trainingPrice = CalculateTrainingPrice(guildhallQuality, player, skillToTrain);
-                int statReduceAmount = CalculateStatSessionReduction(skillToTrain, out reduceHealth, out reduceMagicka);
-                playerEntity.DeductGoldAmount(trainingPrice);
+                int statReduceAmount = CalculateStatSessionReduction(out reduceHealth, out reduceMagicka);
+                playerEntity.DeductGoldAmount(TrainingPrice);
                 if (TrainingServiceOverhaulMain.GetAllowHPMPDamage() && reduceHealth)
                 {
                     int hpDecreased = HealthDecreaseAmount(player);
@@ -177,11 +167,17 @@ namespace DaggerfallWorkshop.Game.UserInterfaceWindows
                     playerEntity.DecreaseMagicka(mpDecreased);
                 }
                 playerEntity.DecreaseFatigue(statReduceAmount * 180); // Maybe eventually refuse training if player is too exhausted
-                int trainingAmount = CalculateTrainingAmount(guildhallQuality, player, skillToTrain);
-                int skillAdvancementMultiplier = DaggerfallSkills.GetAdvancementMultiplier(skillToTrain);
+                player.TallySkill(DFCareer.Skills.Mercantile, (short)(Mathf.Floor(TrainingPrice / 400) + 1));
+                int trainingAmount = CalculateTrainingAmount(guildhallQuality, player);
+                int skillAdvancementMultiplier = DaggerfallSkills.GetAdvancementMultiplier(SkillToTrain);
                 short tallyAmount = (short)(trainingAmount * skillAdvancementMultiplier);
-                playerEntity.TallySkill(skillToTrain, tallyAmount);
-                DaggerfallUI.MessageBox(TrainSkillId);
+                playerEntity.TallySkill(SkillToTrain, tallyAmount);
+
+                TextFile.Token[] tokens = GetTrainedSkillText();
+                DaggerfallMessageBox messageBox = new DaggerfallMessageBox(uiManager, uiManager.TopWindow);
+                messageBox.SetTextTokens(tokens);
+                messageBox.ClickAnywhereToClose = true;
+                messageBox.Show();
             }
         }
 
@@ -209,43 +205,43 @@ namespace DaggerfallWorkshop.Game.UserInterfaceWindows
             }
         }
 
-        public int CalculateTrainingPrice(int Quality, PlayerEntity player, DFCareer.Skills skillToTrain)
+        public int CalculateTrainingPrice(int Quality, PlayerEntity player)
         {
-            int skillValue = playerEntity.Skills.GetPermanentSkillValue(skillToTrain); // Will likely want to change the pricing around later.
+            int skillValue = playerEntity.Skills.GetPermanentSkillValue(SkillToTrain); // Will likely want to change the pricing around later.
             int goldCost = 1;
 
             if (Quality <= 3)       // 01 - 03
             {
                 if (skillValue >= 70)
-                    goldCost = (int)((25 + Quality) * skillValue * 2.0);
+                    goldCost = (int)((25 + Quality) * skillValue * 2.0f);
                 else
                     goldCost = (25 + Quality) * skillValue;
             }
             else if (Quality <= 7)  // 04 - 07
             {
                 if (skillValue >= 70)
-                    goldCost = (int)((25 + Quality) * skillValue * 1.90);
+                    goldCost = (int)((25 + Quality) * skillValue * 1.9f);
                 else
                     goldCost = (25 + Quality) * skillValue;
             }
             else if (Quality <= 13) // 08 - 13
             {
                 if (skillValue >= 70)
-                    goldCost = (int)((25 + Quality) * skillValue * 1.80);
+                    goldCost = (int)((25 + Quality) * skillValue * 1.8f);
                 else
                     goldCost = (25 + Quality) * skillValue;
             }
             else if (Quality <= 17) // 14 - 17
             {
                 if (skillValue >= 70)
-                    goldCost = (int)((25 + Quality) * skillValue * 1.70);
+                    goldCost = (int)((25 + Quality) * skillValue * 1.7f);
                 else
                     goldCost = (25 + Quality) * skillValue;
             }
             else                    // 18 - 20
             {
                 if (skillValue >= 70)
-                    goldCost = (int)((25 + Quality) * skillValue * 1.60);
+                    goldCost = (int)((25 + Quality) * skillValue * 1.6f);
                 else
                     goldCost = (25 + Quality) * skillValue;
             }
@@ -254,15 +250,14 @@ namespace DaggerfallWorkshop.Game.UserInterfaceWindows
                 goldCost = goldCost * TrainingServiceOverhaulMain.GetNonMembMulti(); // Cost mod for non-members
             goldCost = FormulaHelper.CalculateTradePrice(goldCost, Quality, false); // Cost modified by merchant skills like in a normal shop transaction (will test with and without to see effect.)
             goldCost = (int)Mathf.Ceil(goldCost * TrainingServiceOverhaulMain.GetFinalTrainCostMulti()); // Final training cost mod by settings
-            player.TallySkill(DFCareer.Skills.Mercantile, (short)(Mathf.Floor(goldCost / 400) + 1));
 
             return goldCost;
         }
 
-        public int CalculateTrainingAmount(int Quality, PlayerEntity player, DFCareer.Skills skillToTrain)
+        public int CalculateTrainingAmount(int Quality, PlayerEntity player)
         {
             int playerLuck = (int)Mathf.Floor((player.Stats.PermanentLuck - 50) / 5f);
-            int skillValue = playerEntity.Skills.GetPermanentSkillValue(skillToTrain);
+            int skillValue = playerEntity.Skills.GetPermanentSkillValue(SkillToTrain);
             int trainingAmount = 1;
 
             if (Quality <= 3)       // 01 - 03
@@ -296,9 +291,9 @@ namespace DaggerfallWorkshop.Game.UserInterfaceWindows
             return trainingAmount;
         }
 
-        public int CalculateStatSessionReduction(DFCareer.Skills skillToTrain, out bool reduceHealth, out bool reduceMagicka)
+        public int CalculateStatSessionReduction(out bool reduceHealth, out bool reduceMagicka)
         {
-            int skillId = (int)skillToTrain;
+            int skillId = (int)SkillToTrain;
             reduceHealth = false;
             reduceMagicka = false;
 
@@ -352,7 +347,7 @@ namespace DaggerfallWorkshop.Game.UserInterfaceWindows
 
         public int HealthDecreaseAmount(PlayerEntity player) // Maybe eventually refuse training if player is too hurt
         {
-            float rolledHpPercent = UnityEngine.Random.Range(0.10f, 0.25f);
+            float rolledHpPercent = UnityEngine.Random.Range(0.1f, 0.25f);
             int hpReduceValue = (int)Mathf.Floor(player.MaxHealth * rolledHpPercent);
 
             if (player.CurrentHealth > hpReduceValue)
@@ -363,13 +358,54 @@ namespace DaggerfallWorkshop.Game.UserInterfaceWindows
 
         public int MagickaDecreaseAmount(PlayerEntity player) // Maybe eventually refuse training if player is too low on magic
         {
-            float rolledMpPercent = UnityEngine.Random.Range(0.05f, 0.20f);
+            float rolledMpPercent = UnityEngine.Random.Range(0.05f, 0.2f);
             int mpReduceValue = Mathf.Max((int)Mathf.Floor(player.MaxMagicka * rolledMpPercent), 5);
 
             if (player.CurrentMagicka > mpReduceValue)
                 return mpReduceValue;
             else
                 return 0;
+        }
+
+        public TextFile.Token[] GetRandomTrainingTooSoonText(int minsBeforeTrainAgain)
+        {
+            int hoursBeforeTrainAgain = Mathf.CeilToInt(minsBeforeTrainAgain / 60);
+            string pluralH = hoursBeforeTrainAgain <= 1 ? "1 more hour " : hoursBeforeTrainAgain + " more hours ";
+
+            TextFile.Token[] textToken;
+            if (Dice100.SuccessRoll(50))
+            {
+                textToken = DaggerfallUnity.Instance.TextProvider.CreateTokens(TextFile.Formatting.JustifyCenter,
+                "You should give yourself time to reflect",
+                "on your recent training session.",
+                "",
+                "(" + pluralH + "before you can train again)");
+            }
+            else
+            {
+                textToken = DaggerfallUnity.Instance.TextProvider.CreateTokens(TextFile.Formatting.JustifyCenter,
+                "Learning is a marathon, not a race.",
+                "You should take some time to reflect",
+                "on your recent training.",
+                "",
+                "(" + pluralH + "before you can train again)");
+            }
+            return textToken;
+        }
+
+        public TextFile.Token[] GetTrainedSkillText()
+        {
+            string pluralH = " quickly.";
+            int trainingH = TrainingServiceOverhaulMain.GetHoursPassedTraining();
+            if (trainingH > 0)
+                pluralH = trainingH == 1 ? " for 1 hour." : " for " + trainingH + " hours.";
+
+            TextFile.Token[] textToken = DaggerfallUnity.Instance.TextProvider.CreateTokens(TextFile.Formatting.JustifyCenter,
+            "You and the trainer practice" + pluralH + " The trainer",
+            "tells you to reflect on what you've learned,",
+            "and see if you can put it to good use.");
+
+            return textToken;
         }
     }
 }

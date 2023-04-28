@@ -81,6 +81,20 @@
             "$version": "v1"
         },
         {
+            "Name": " ",
+            "Description": null,
+            "IsAdvanced": false,
+            "Keys": [],
+            "$version": "v1"
+        },
+        {
+            "Name": "  ",
+            "Description": null,
+            "IsAdvanced": false,
+            "Keys": [],
+            "$version": "v1"
+        },
+        {
             "Name": "MaxSkillsCanBeTrain",
             "Description": "Alters How High Skills Are Allowed To Be Trained To In General",
             "IsAdvanced": false,

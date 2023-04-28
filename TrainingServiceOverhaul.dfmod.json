@@ -1,9 +1,9 @@
 {
     "ModTitle": "TrainingServiceOverhaul",
-    "ModVersion": "1.00",
+    "ModVersion": "1.05",
     "ModAuthor": "Kirk.O",
     "ContactInfo": "kirkoliveri@gmail.com",
-    "DFUnity_Version": "0.13.4",
+    "DFUnity_Version": "0.14.5",
     "ModDescription": "Overhauls How The Training Services Work To Be More Detailed And Interesting",
     "GUID": "6135629c-08ef-4c57-8385-70b85b71ebf5",
     "Files": [
